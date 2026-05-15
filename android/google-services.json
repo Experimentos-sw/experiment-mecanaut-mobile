@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "564250146690",
+    "project_id": "mecanaut-c669b",
+    "storage_bucket": "mecanaut-c669b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564250146690:android:66335ffbae7328c36a419b",
+        "android_client_info": {
+          "package_name": "com.mecanaut.mecanaut_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZeHa6u5RxbTtTkAWUR6SSem0I7VpgyMc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
