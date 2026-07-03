@@ -16,6 +16,7 @@ import 'package:mecanaut_mobile/features/assets/data/services/ProductionLinesSer
 import 'package:mecanaut_mobile/features/inventory/data/models/plant_item.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/models/dynamic_maintenance_plan_dto.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/services/DynamicMaintenancePlansService.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/presentation/screens/wizard/NewDynamicPlanWizard.dart';
 
 class MaintenancePlansScreen extends ConsumerStatefulWidget {
   const MaintenancePlansScreen({super.key});
@@ -374,12 +375,15 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
       builder: (_) => AppBottomSheet(
         title: 'Nuevo Plan',
         onClose: () => Navigator.of(context).pop(),
-        child: _NewDynamicPlanSheet(
-          plants: _plants,
-          initialPlantId: _selectedPlantId,
-          linesService: _linesService,
-          machinesService: _machinesService,
-          metricDefinitions: _metricDefinitions,
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: NewDynamicPlanWizard(
+            plants: _plants,
+            initialPlantId: _selectedPlantId,
+            linesService: _linesService,
+            machinesService: _machinesService,
+            metricDefinitions: _metricDefinitions,
+          ),
         ),
       ),
     );
