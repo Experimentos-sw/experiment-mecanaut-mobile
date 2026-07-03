@@ -1,4 +1,4 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +8,9 @@ import 'package:mecanaut_mobile/core/widgets/AppScaffold.dart';
 import 'package:mecanaut_mobile/core/widgets/ErrorStateView.dart';
 import 'package:mecanaut_mobile/core/widgets/LoadingView.dart';
 import 'package:mecanaut_mobile/features/assets/data/services/MachinesService.dart';
+import 'package:mecanaut_mobile/features/assets/data/services/PlantsService.dart';
 import 'package:mecanaut_mobile/features/assets/data/services/ProductionLinesService.dart';
+import 'package:mecanaut_mobile/features/inventory/data/models/plant_item.dart';
 import 'package:mecanaut_mobile/features/personnel/data/models/user_item.dart';
 import 'package:mecanaut_mobile/features/personnel/data/services/UsersService.dart';
 import 'package:mecanaut_mobile/features/work_orders/data/models/work_order_item.dart';
@@ -24,6 +26,7 @@ class WorkOrdersScreen extends ConsumerStatefulWidget {
 
 class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
   late final WorkOrdersService _workOrdersService;
+  late final PlantsService _plantsService;
   late final ProductionLinesService _productionLinesService;
   late final MachinesService _machinesService;
   late final UsersService _usersService;
@@ -34,8 +37,10 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
   String _query = '';
 
   List<WorkOrderItem> _orders = <WorkOrderItem>[];
+  List<PlantItem> _plants = <PlantItem>[];
   List<ProductionLineItem> _lines = <ProductionLineItem>[];
   List<UserItem> _technicians = <UserItem>[];
+  int? _selectedPlantId;
   int? _selectedLineId;
   WorkOrderItem? _selectedOrder;
 
@@ -44,6 +49,7 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
     super.initState();
     final Dio dio = ref.read(apiDioProvider);
     _workOrdersService = WorkOrdersService(dio);
+    _plantsService = PlantsService(dio);
     _productionLinesService = ProductionLinesService(dio);
     _machinesService = MachinesService(dio);
     _usersService = UsersService(dio);
@@ -57,16 +63,28 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
     });
 
     try {
-      final lines = await _productionLinesService.getProductionLines();
+      final plants = await _plantsService.getPlants();
       final users = await _usersService.getUsers();
       final techs = users
           .where((u) => u.roles.contains('RoleTechnical'))
           .toList();
+          
+      int? initialPlantId = _selectedPlantId;
+      if (initialPlantId == null && plants.isNotEmpty) {
+        initialPlantId = plants.first.id;
+      }
+      
       setState(() {
-        _lines = lines;
+        _plants = plants;
+        _selectedPlantId = initialPlantId;
         _technicians = techs;
-        _loading = false;
       });
+      
+      if (initialPlantId != null) {
+        await _loadLinesForPlant();
+      } else {
+        setState(() => _loading = false);
+      }
     } on ApiException catch (e) {
       setState(() {
         _loading = false;
@@ -76,6 +94,38 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
       setState(() {
         _loading = false;
         _error = 'Error al cargar datos de ordenes.';
+      });
+    }
+  }
+
+  Future<void> _loadLinesForPlant() async {
+    if (_selectedPlantId == null) {
+      setState(() {
+        _lines = [];
+        _selectedLineId = null;
+        _orders = [];
+        _selectedOrder = null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final lines = await _productionLinesService.getProductionLines(plantId: _selectedPlantId);
+      setState(() {
+        _lines = lines;
+        _selectedLineId = null;
+        _orders = [];
+        _selectedOrder = null;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _loading = false;
+        _error = e.message;
       });
     }
   }
@@ -140,6 +190,7 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
         Row(
           children: <Widget>[
             Expanded(
+              flex: 2,
               child: TextField(
                 decoration: const InputDecoration(
                   hintText: 'Buscar',
@@ -149,10 +200,31 @@ class _WorkOrdersScreenState extends ConsumerState<WorkOrdersScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            SizedBox(
-              width: 120,
+            Expanded(
+              flex: 2,
               child: DropdownButtonFormField<int>(
-                initialValue: _selectedLineId,
+                value: _selectedPlantId,
+                decoration: const InputDecoration(),
+                hint: const Text('Planta'),
+                items: _plants
+                    .map(
+                      (plant) => DropdownMenuItem<int>(
+                        value: plant.id,
+                        child: Text(plant.name),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (int? value) async {
+                  setState(() => _selectedPlantId = value);
+                  await _loadLinesForPlant();
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<int>(
+                value: _selectedLineId,
                 decoration: const InputDecoration(),
                 hint: const Text('Linea'),
                 items: _lines

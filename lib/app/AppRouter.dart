@@ -16,6 +16,7 @@ import 'package:mecanaut_mobile/features/maintenance_plans/presentation/screens/
 import 'package:mecanaut_mobile/features/personnel/presentation/screens/PersonnelScreen.dart';
 import 'package:mecanaut_mobile/features/settings/presentation/screens/SettingsScreen.dart';
 import 'package:mecanaut_mobile/features/work_orders/presentation/screens/WorkOrdersScreen.dart';
+import 'package:mecanaut_mobile/features/execution/presentation/screens/ExecutionScreen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String home = '/';
   static const String dashboard = '/dashboard';
   static const String workOrders = '/orden-trabajo';
+  static const String execution = '/ejecucion';
   static const String weeklyCalendar = '/calendario-semanal';
   static const String monthlyCalendar = '/calendario-mensual';
   static const String inventory = '/inventario-repuestos';
@@ -73,6 +75,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.workOrders,
         builder: (_, __) => const WorkOrdersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.execution,
+        builder: (_, __) => const ExecutionScreen(),
       ),
       GoRoute(
         path: AppRoutes.weeklyCalendar,
