@@ -120,6 +120,13 @@ class _AppSidebarMenuState extends State<AppSidebarMenu> {
                     route: '/orden-trabajo',
                     icon: Icons.assignment_outlined,
                   ),
+                  if (_isTechnical)
+                    _item(
+                      context,
+                      label: 'Ejecucion',
+                      route: '/ejecucion',
+                      icon: Icons.play_circle_outline,
+                    ),
                   _item(
                     context,
                     label: 'Planes de Mantenimiento',
