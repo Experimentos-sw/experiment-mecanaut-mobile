@@ -17,6 +17,8 @@ import 'package:mecanaut_mobile/features/inventory/data/models/plant_item.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/models/dynamic_maintenance_plan_dto.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/services/DynamicMaintenancePlansService.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/presentation/screens/wizard/NewDynamicPlanWizard.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/models/create_experiment_survey_request.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/services/ExperimentSurveysService.dart';
 
 class MaintenancePlansScreen extends ConsumerStatefulWidget {
   const MaintenancePlansScreen({super.key});
@@ -31,6 +33,7 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
   late final MachinesService _machinesService;
   late final MetricDefinitionsService _metricsService;
   late final DynamicMaintenancePlansService _dynamicPlansService;
+  late final ExperimentSurveysService _surveysService;
 
   bool _loading = true;
   String? _error;
@@ -55,6 +58,7 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
     _machinesService = MachinesService(dio);
     _metricsService = MetricDefinitionsService(dio);
     _dynamicPlansService = DynamicMaintenancePlansService(dio);
+    _surveysService = ExperimentSurveysService(dio);
     _loadInitial();
   }
 
@@ -388,14 +392,20 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
       ),
     );
 
-    if (result == null) return;
+    if (result == null) {
+      if (mounted) await _showSurveyDialog(finished: false, planId: 0);
+      return;
+    }
+    
     try {
-      await _dynamicPlansService.create(result);
+      final plan = await _dynamicPlansService.create(result);
       await _reloadPlansForSelectedLine();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Plan de mantenimiento creado correctamente.')),
         );
+        int planId = int.tryParse(plan.id) ?? 0;
+        await _showSurveyDialog(finished: true, planId: planId);
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -404,6 +414,82 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
         );
       }
     }
+  }
+
+  Future<void> _showSurveyDialog({required bool finished, required int planId}) async {
+    int rating = 0;
+    final commentController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Breve encuesta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('¿Qué tan fácil fue usar este asistente?'),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            rating = index + 1;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Comentarios adicionales (opcional)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Omitir'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    try {
+                      await _surveysService.create(
+                        CreateExperimentSurveyRequest(
+                          maintenancePlanId: planId,
+                          rating: rating > 0 ? rating : 3,
+                          variant: 'wizard',
+                          action: finished ? 'finished' : 'abandoned',
+                          comment: commentController.text,
+                        )
+                      );
+                    } catch (_) {
+                      // Silently fail telemetry
+                    }
+                  },
+                  child: const Text('Enviar'),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
   }
 
   void _showPlanDetail(DynamicMaintenancePlanDto plan) {
