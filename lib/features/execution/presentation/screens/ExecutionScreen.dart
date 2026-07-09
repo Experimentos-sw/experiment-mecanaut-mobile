@@ -14,6 +14,8 @@ import 'package:mecanaut_mobile/features/inventory/data/models/plant_item.dart';
 import 'package:mecanaut_mobile/features/work_orders/data/models/work_order_item.dart';
 import 'package:mecanaut_mobile/features/execution/data/services/ExecutionService.dart';
 import 'package:mecanaut_mobile/features/execution/data/models/save_executed_work_order_request.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/services/ExperimentTelemetryService.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/models/telemetry_resource.dart';
 
 class ExecutionScreen extends ConsumerStatefulWidget {
   const ExecutionScreen({super.key});
@@ -24,6 +26,7 @@ class ExecutionScreen extends ConsumerStatefulWidget {
 
 class _ExecutionScreenState extends ConsumerState<ExecutionScreen> {
   late final ExecutionService _executionService;
+  late final ExperimentTelemetryService _telemetryService;
 
   bool _loading = true;
   String? _error;
@@ -65,6 +68,7 @@ class _ExecutionScreenState extends ConsumerState<ExecutionScreen> {
     super.initState();
     final Dio dio = ref.read(apiDioProvider);
     _executionService = ExecutionService(dio);
+    _telemetryService = ExperimentTelemetryService(dio);
     _loadInitial();
   }
 
@@ -272,6 +276,47 @@ class _ExecutionScreenState extends ConsumerState<ExecutionScreen> {
       return;
     }
     
+    if (!_noProductsUsed) {
+      List<Map<String, dynamic>> shortages = [];
+      for (var p in _usedProducts) {
+        if (p['partId'] == null) continue;
+        int partId = p['partId'];
+        int required = p['quantity'];
+        final part = _inventoryParts.where((ip) => ip.id == partId).firstOrNull;
+        int available = part?.currentStock ?? 0;
+        if (required > available) {
+          shortages.add({
+            'name': part?.name ?? part?.code ?? partId.toString(),
+            'required': required,
+            'available': available,
+          });
+        }
+      }
+
+      if (shortages.isNotEmpty) {
+        _telemetryService.recordMetric(TelemetryResource(
+          experimentName: 'US11-R',
+          variant: 'Treatment',
+          actionType: 'Order_Start_Inventory_Warning_Shown',
+          durationMilliseconds: 0,
+          isSuccess: true,
+          additionalData: '{"orderId": ${_selectedOrder!.id}, "shortages": ${shortages.length}}'
+        ));
+
+        _showInventoryAlert(shortages);
+        return;
+      }
+    }
+
+    _telemetryService.recordMetric(TelemetryResource(
+      experimentName: 'US11-R',
+      variant: 'Treatment',
+      actionType: 'Order_Start_Inventory_OK',
+      durationMilliseconds: 0,
+      isSuccess: true,
+      additionalData: '{"orderId": ${_selectedOrder!.id}}'
+    ));
+
     bool saved = await _saveProgress();
     if (!saved) return;
     
@@ -291,6 +336,30 @@ class _ExecutionScreenState extends ConsumerState<ExecutionScreen> {
         ],
       ));
     }
+  }
+
+  void _showInventoryAlert(List<Map<String, dynamic>> shortages) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Stock insuficiente', style: TextStyle(color: Colors.red)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Se detectaron repuestos con cantidad insuficiente. No es posible finalizar la orden hasta resolver los faltantes.'),
+            const SizedBox(height: 10),
+            ...shortages.map((s) => Text('• ${s['name']}: Req ${s['required']}, Disp ${s['available']}')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar'),
+          )
+        ],
+      ),
+    );
   }
 
   @override

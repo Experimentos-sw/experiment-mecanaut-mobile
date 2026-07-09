@@ -6,6 +6,8 @@ class CreateExperimentSurveyRequest {
     this.action,
     this.userId,
     this.comment,
+    this.durationSeconds,
+    this.lastStep,
   });
 
   final int maintenancePlanId;
@@ -14,6 +16,8 @@ class CreateExperimentSurveyRequest {
   final String? action;
   final int? userId;
   final String? comment;
+  final int? durationSeconds;
+  final String? lastStep;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -23,6 +27,8 @@ class CreateExperimentSurveyRequest {
       if (action != null) 'action': action,
       if (userId != null) 'userId': userId,
       if (comment != null && comment!.trim().isNotEmpty) 'comment': comment,
+      if (durationSeconds != null) 'durationSeconds': durationSeconds,
+      if (lastStep != null && lastStep!.trim().isNotEmpty) 'lastStep': lastStep,
     };
   }
 }

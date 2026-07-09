@@ -19,6 +19,8 @@ import 'package:mecanaut_mobile/features/maintenance_plans/data/services/Dynamic
 import 'package:mecanaut_mobile/features/maintenance_plans/presentation/screens/wizard/NewDynamicPlanWizard.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/models/create_experiment_survey_request.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/services/ExperimentSurveysService.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/services/ExperimentTelemetryService.dart';
+import 'package:mecanaut_mobile/features/maintenance_plans/data/models/telemetry_resource.dart';
 
 class MaintenancePlansScreen extends ConsumerStatefulWidget {
   const MaintenancePlansScreen({super.key});
@@ -34,6 +36,7 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
   late final MetricDefinitionsService _metricsService;
   late final DynamicMaintenancePlansService _dynamicPlansService;
   late final ExperimentSurveysService _surveysService;
+  late final ExperimentTelemetryService _telemetryService;
 
   bool _loading = true;
   String? _error;
@@ -59,6 +62,7 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
     _metricsService = MetricDefinitionsService(dio);
     _dynamicPlansService = DynamicMaintenancePlansService(dio);
     _surveysService = ExperimentSurveysService(dio);
+    _telemetryService = ExperimentTelemetryService(dio);
     _loadInitial();
   }
 
@@ -373,7 +377,8 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
   }
 
   Future<void> _openNewPlanModal() async {
-    final result = await showModalBottomSheet<SaveDynamicMaintenancePlanRequest>(
+    final startTime = DateTime.now();
+    final result = await showModalBottomSheet<WizardResult>(
       context: context,
       isScrollControlled: true,
       builder: (_) => AppBottomSheet(
@@ -392,20 +397,41 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
       ),
     );
 
-    if (result == null) {
-      if (mounted) await _showSurveyDialog(finished: false, planId: 0);
+    if (result == null || result.request == null) {
+      final duration = result?.durationSeconds ?? DateTime.now().difference(startTime).inSeconds;
+      final step = result?.lastStep ?? 'Desconocido';
+      
+      _telemetryService.recordMetric(TelemetryResource(
+        experimentName: 'US09-R | US07-R',
+        variant: 'Treatment',
+        actionType: 'Plan_Creation_Abandoned',
+        durationMilliseconds: duration * 1000,
+        isSuccess: false,
+        additionalData: '{"lastStep": "$step"}',
+      )).catchError((_) {});
+
+      if (mounted) await _showSurveyDialog(finished: false, planId: 0, durationSeconds: duration, lastStep: step);
       return;
     }
     
     try {
-      final plan = await _dynamicPlansService.create(result);
+      final plan = await _dynamicPlansService.create(result.request!);
+      
+      _telemetryService.recordMetric(TelemetryResource(
+        experimentName: 'US09-R | US07-R',
+        variant: 'Treatment',
+        actionType: 'Plan_Created',
+        durationMilliseconds: result.durationSeconds * 1000,
+        isSuccess: true,
+        additionalData: '{"lastStep": "${result.lastStep}"}',
+      )).catchError((_) {});
       await _reloadPlansForSelectedLine();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Plan de mantenimiento creado correctamente.')),
         );
         int planId = int.tryParse(plan.id) ?? 0;
-        await _showSurveyDialog(finished: true, planId: planId);
+        await _showSurveyDialog(finished: true, planId: planId, durationSeconds: result.durationSeconds, lastStep: result.lastStep);
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -416,7 +442,7 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
     }
   }
 
-  Future<void> _showSurveyDialog({required bool finished, required int planId}) async {
+  Future<void> _showSurveyDialog({required bool finished, required int planId, int? durationSeconds, String? lastStep}) async {
     int rating = 0;
     final commentController = TextEditingController();
 
@@ -476,6 +502,8 @@ class _MaintenancePlansScreenState extends ConsumerState<MaintenancePlansScreen>
                           variant: 'wizard',
                           action: finished ? 'finished' : 'abandoned',
                           comment: commentController.text,
+                          durationSeconds: durationSeconds,
+                          lastStep: lastStep,
                         )
                       );
                     } catch (_) {
