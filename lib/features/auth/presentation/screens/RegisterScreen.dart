@@ -37,6 +37,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _acceptTerms = false;
   bool _hidePassword = true;
   bool _hideConfirm = true;
+  String _selectedRole = 'administrador';
 
   @override
   void dispose() {
@@ -223,8 +224,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 16),
                   _sectionCard(
                     title: 'Informacion personal',
-                    subtitle: 'Completa tus datos de administrador',
+                    subtitle: 'Completa tus datos personales y selecciona tu rol',
                     children: <Widget>[
+                      _label('Selecciona tu Rol'),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: _roleCard(
+                              role: 'administrador',
+                              title: 'Administrador',
+                              icon: Icons.admin_panel_settings_outlined,
+                              isSelected: _selectedRole == 'administrador',
+                              onTap: () => setState(() => _selectedRole = 'administrador'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _roleCard(
+                              role: 'tecnico',
+                              title: 'Técnico',
+                              icon: Icons.engineering_outlined,
+                              isSelected: _selectedRole == 'tecnico',
+                              onTap: () => setState(() => _selectedRole = 'tecnico'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
                       _label('Usuario'),
                       TextFormField(
                         controller: _usernameController,
@@ -483,6 +509,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       email: _userEmailController.text.trim(),
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
+      role: _selectedRole,
     );
 
     final ok = await ref.read(authSessionProvider).signUp(request);
@@ -598,5 +625,58 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _orNull(TextEditingController controller) {
     final text = controller.text.trim();
     return text.isEmpty ? null : text;
+  }
+
+  Widget _roleCard({
+    required String role,
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE8EEF8) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1F56A0) : const Color(0xFFE4E7EF),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF1F56A0).withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 28,
+              color: isSelected ? const Color(0xFF1F56A0) : const Color(0xFF7E8594),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? const Color(0xFF1F56A0) : const Color(0xFF3D3D3D),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
