@@ -7,6 +7,14 @@ import 'package:mecanaut_mobile/features/assets/data/services/ProductionLinesSer
 import 'package:mecanaut_mobile/features/inventory/data/models/plant_item.dart';
 import 'package:mecanaut_mobile/features/maintenance_plans/data/models/dynamic_maintenance_plan_dto.dart';
 
+class WizardResult {
+  final SaveDynamicMaintenancePlanRequest? request;
+  final int durationSeconds;
+  final String lastStep;
+
+  WizardResult({this.request, required this.durationSeconds, required this.lastStep});
+}
+
 class NewDynamicPlanWizard extends StatefulWidget {
   const NewDynamicPlanWizard({
     super.key,
@@ -29,6 +37,7 @@ class NewDynamicPlanWizard extends StatefulWidget {
 
 class _NewDynamicPlanWizardState extends State<NewDynamicPlanWizard> {
   int _currentStep = 0;
+  final DateTime _startTime = DateTime.now();
 
   // Form State
   final _nameController = TextEditingController();
@@ -127,6 +136,17 @@ class _NewDynamicPlanWizardState extends State<NewDynamicPlanWizard> {
     return max(1.0, val);
   }
 
+  String get _currentStepName {
+    switch (_currentStep) {
+      case 0: return "Nombre del plan";
+      case 1: return "Parametros y Frecuencia";
+      case 2: return "Ubicacion y Maquinaria";
+      case 3: return "Tareas";
+      case 4: return "Resumen";
+      default: return "Desconocido";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -180,7 +200,12 @@ class _NewDynamicPlanWizardState extends State<NewDynamicPlanWizard> {
                 if (_currentStep > 0) {
                   setState(() => _currentStep -= 1);
                 } else {
-                  Navigator.of(context).pop();
+                  final duration = DateTime.now().difference(_startTime).inSeconds;
+                  Navigator.of(context).pop(WizardResult(
+                    request: null,
+                    durationSeconds: duration,
+                    lastStep: _currentStepName,
+                  ));
                 }
               },
               controlsBuilder: (context, details) {
@@ -417,6 +442,11 @@ class _NewDynamicPlanWizardState extends State<NewDynamicPlanWizard> {
       tasks: tasks,
     );
 
-    Navigator.of(context).pop(request);
+    final duration = DateTime.now().difference(_startTime).inSeconds;
+    Navigator.of(context).pop(WizardResult(
+      request: request,
+      durationSeconds: duration,
+      lastStep: 'Enviar',
+    ));
   }
 }
